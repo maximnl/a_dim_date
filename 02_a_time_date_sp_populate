@@ -1,0 +1,198 @@
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- [A_TIME_DATE] is the name of date dimension
+-- It will generate data between starting_dt en ending_dt dates
+-- pas the dates when calling the SP, to cover your business needs, avoid to broad range 
+-- if you report like 10 years back, use 2010-01-01 ans the starting date, for instance.   
+-- you can add dates later on, so do not fille it up till 2100 right away, usually 5 years in the future will do. 
+-- (unless you really make long term forecasts)
+
+CREATE OR ALTER   PROCEDURE [A_SP_TIME_DATE_POPULATE]
+		@starting_dt DATE
+     ,	@ending_dt DATE
+	 ,  @country_iso char(2)='NL'
+AS
+
+-- SETS OPTIONS
+SET LANGUAGE Dutch
+SET DATEFIRST 1 -- european day of week on monday ->1
+
+-- DECLARE VARS  
+DECLARE @Control_Date DATE     --Current date in loop
+DECLARE @Yr int
+SET @Control_Date = @starting_dt
+
+delete from [A_TIME_DATE] where [date] between @starting_dt and @ending_dt
+
+-- LOOP AND INSERT NEW DAYS
+WHILE @Control_Date <= @ending_dt
+BEGIN
+    
+ 
+	INSERT INTO [A_TIME_DATE]
+           ([date]
+		   ,[date_key]
+		   ,[date_key_char]
+		   ,[year]
+           ,country)
+
+     SELECT 
+            @Control_Date AS [date]
+		   ,CAST(CONVERT(char(8), @Control_Date,112) as int) AS [date_key]
+		   ,CONVERT(char(8), @Control_Date,112)  [date_key_char]
+		   ,year(@Control_Date)
+		   ,@country_iso 
+   
+	SET @Control_Date = DATEADD(dd, 1, @Control_Date)
+END
+ 
+-- UPDATE THE FIELDS
+UPDATE [A_TIME_DATE]
+   SET 
+      [semester] = CASE (DATEPART(mm, [date]))
+                    WHEN 1 THEN 1
+                    WHEN 2 THEN 1
+                    WHEN 3 THEN 1
+                    WHEN 4 THEN 1
+                    WHEN 5 THEN 1
+                     WHEN 6 THEN 1
+                    ELSE 2
+               END  
+      ,[quarter] =  DATEPART(qq, [date])  
+      ,[month] = right(100+DATEPART(mm, [date])  ,2)
+      ,[month_quarter] = CASE DATEPART(mm, [date])
+                    WHEN 1 THEN 1
+                    WHEN 2 THEN 2
+                     WHEN 3 THEN 3
+                    WHEN 4 THEN 1
+                    WHEN 5 THEN 2
+                    WHEN 6 THEN 3
+                    WHEN 7 THEN 1
+                    WHEN 8 THEN 2
+                     WHEN 9 THEN 3
+                    WHEN 10 THEN 1
+                    WHEN 11 THEN 2
+                    ELSE 3
+               END    
+      ,[month_long] = DATENAME(month, [date])  
+      ,[month_short] = LEFT(DATENAME(month, [date]), 3)  
+	  ,[months_2000] =  DATEDIFF(mm, '19991231', [date])  
+	  ,[month_days] = 
+    case datepart(m,[date])
+        when  1 then 31
+        when  2 then 
+            case 
+                when cast(
+        case when (([year] % 4 = 0) and ([year] % 100 != 0)) or ([year] % 400 = 0)
+        then 1
+        else 0
+        end
+    as bit ) = 0
+                then 28
+                else 29
+            end
+        when  3 then 31
+        when  4 then 30
+        when  5 then 31
+        when  6 then 30
+        when  7 then 31
+        when  8 then 31
+        when  9 then 30 
+        when 10 then 31
+        when 11 then 30 
+        when 12 then 31
+    end
+
+      ,[year52] = CASE
+               WHEN DATEPART(mm, [date]) = 1 AND DATEPART(isoww, [date]) > 50
+                THEN CAST([year] - 1 AS char(4))  
+               WHEN DATEPART(mm, [date]) = 12 AND DATEPART(isoww, [date]) < 40
+                THEN CAST([year] + 1 AS char(4))  
+               ELSE CAST([year] AS char(4))  
+                END   
+      ,[year_quarter_char] =  right( CAST([year] AS char(4)) + 'Q' + RIGHT('0' + CAST(DATEPART(qq, [date]) AS char(1)), 2)   ,4)
+      ,[year_month_char] = CONVERT(varchar(7), [date], 126)  
+      ,[year_week] = CASE
+                       WHEN DATEPART(mm, [date]) = 1 AND DATEPART(isoww, [date]) > 50
+                       THEN ([year] - 1) *100 + DATEPART(isoww, [date]) 
+                       WHEN DATEPART(mm, [date]) = 12 AND DATEPART(isoww, [date]) < 40
+                       THEN ([year] + 1) * 100 + DATEPART(isoww, [date])
+                       ELSE [year] *100 + DATEPART(isoww, [date]) 
+                       END  
+      ,[year_week_long] =  CASE
+               WHEN DATEPART(mm, [date]) = 1 AND DATEPART(isoww, [date]) > 50
+                THEN CAST([year] - 1 AS char(4)) + 'W' + RIGHT('0' + CAST(DATEPART(isoww, [date]) AS varchar(2)), 2)
+               WHEN DATEPART(mm, [date]) = 12 AND DATEPART(isoww, [date]) < 40
+                THEN CAST([year] + 1 AS char(4)) + 'W' + RIGHT('0' + CAST(DATEPART(isoww, [date]) AS varchar(2)), 2)
+               ELSE CAST([year] AS char(4)) + 'W' + RIGHT('0' + CAST(DATEPART(isoww, [date]) AS varchar(2)), 2)
+                END  
+      ,[year_week_short] = right(CASE
+               WHEN DATEPART(mm, [date]) = 1 AND DATEPART(isoww, [date]) > 50
+                THEN CAST([year] - 1 AS char(4)) + '''' + RIGHT('0' + CAST(DATEPART(isoww, [date]) AS varchar(2)), 2)
+               WHEN DATEPART(mm, [date]) = 12 AND DATEPART(isoww, [date]) < 40
+                THEN CAST([year] + 1 AS char(4)) + '''' + RIGHT('0' + CAST(DATEPART(isoww, [date]) AS varchar(2)), 2)
+               ELSE CAST([year] AS char(4)) + '''' + RIGHT('0' + CAST(DATEPART(isoww, [date]) AS varchar(2)), 2)
+                END  ,5)
+      ,[week] = right(100+DATEPART(isoww, [date]) ,2)
+      ,[week_quarter] =  right(100+CASE
+               WHEN DATEPART(isoww, [date]) < 14
+                THEN DATEPART(isoww, [date])
+               WHEN DATEPART(isoww, [date]) > 13 AND DATEPART(isoww, [date]) < 27
+               THEN DATEPART(isoww, [date]) - 13
+               WHEN DATEPART(isoww, [date]) > 26 AND DATEPART(isoww, [date]) < 40
+                THEN DATEPART(isoww, [date]) - 26
+               ELSE DATEPART(isoww, [date]) - 39
+               END  ,2)
+      ,[week_month] =  datepart(day, datediff(day, 0,[date])/7 * 7)/7 + 1
+      ,[weeks_2000] = DATEDIFF(wk, DATEADD(dd,-1, '20000101'), DATEADD(dd,-1,[date])) 
+      ,[day_long] =  DATENAME(weekday, [date])  
+
+      ,[day_short] = LEFT(DATENAME(weekday, [date]), 2)  
+      ,[day_year] = right(1000+DATEPART(dy, [date]),3)
+      ,[day_quarter] =right(100+ CASE
+               WHEN DATEPART(mm, [date]) = 1
+                    OR DATEPART(mm, [date]) = 4
+                     OR DATEPART(mm, [date]) = 7
+                    OR DATEPART(mm, [date]) = 10
+               THEN DATEPART(day, [date])
+               WHEN DATEPART(mm, [date]) = 2
+                     OR DATEPART(mm, [date]) = 5
+                    OR DATEPART(mm, [date]) = 8
+                    OR DATEPART(mm, [date]) = 11
+               THEN DATEPART(day, [date])
+                          + DAY(DATEADD (m, 1, DATEADD (d, 1 - DAY(CAST(CAST([year] AS char(4))
+                         + RIGHT('0' + CAST(DATEPART(mm, [date]) - 1 AS varchar(2)), 2) + '01' AS DATE))
+                          , CAST(CAST([year] AS char(4)) + RIGHT('0' + CAST(DATEPART(mm, [date]) - 1 AS varchar(2)), 2) + '01' AS DATETIME)))
+                         - 1)
+               WHEN DATEPART(mm, [date]) = 3
+                     OR DATEPART(mm, [date]) = 6
+                    OR DATEPART(mm, [date]) = 9
+                    OR DATEPART(mm, [date]) = 12
+               THEN DATEPART(day, [date])
+                          + DAY(DATEADD (m, 1, DATEADD (d, 1 - DAY(CAST(CAST([year] AS char(4))
+                         + RIGHT('0' + CAST(DATEPART(mm, [date]) - 1 AS varchar(2)), 2) + '01' AS DATE))
+                          , CAST(CAST([year] AS char(4)) + RIGHT('0' + CAST(DATEPART(mm, [date]) - 1 AS varchar(2)), 2) + '01' AS DATETIME)))
+                         - 1)
+                         + DAY(DATEADD (m, 1, DATEADD (d, 1 - DAY(CAST(CAST([year] AS char(4))
+                          + RIGHT('0' + CAST(DATEPART(mm, [date]) - 2 AS varchar(2)), 2) + '01' AS DATE))
+                         , CAST(CAST([year] AS char(4)) + RIGHT('0' + CAST(DATEPART(mm, [date]) - 2 AS varchar(2)), 2) + '01' AS DATETIME)))
+                          - 1)
+               END  ,2)
+      ,[day_month] =  right(100+DATEPART(day, [date]),2)  
+      ,[day_week] = DATEPART(weekday, [date])  
+	  ,[days_2000] =  DATEDIFF(dd, '19991231', [date])  
+      ,[YYYYMMDD] = CONVERT(varchar(8), [date], 112) 
+      ,[MM/DD/YYYY] = CONVERT(varchar(10), [date], 101)  
+      ,[YYYY/MM/DD] = CONVERT(varchar(10), [date], 111)
+      ,[YYYY-MM-DD] = REPLACE(CONVERT(varchar(10), [date], 111), '/', '-')
+      ,[DD-MM-YYYY] = CONVERT (varchar, [date], 105)
+      ,[MMM DD YYYY] = LEFT(DATENAME(month, [date]), 3) + ' ' +
+               RIGHT('0' + CAST(DATEPART(dd, [date]) AS varchar(2)), 2) + ' ' +
+               CAST([year] AS CHAR(4))  
+	  where [date] between @starting_dt and @ending_dt
+   
+    
