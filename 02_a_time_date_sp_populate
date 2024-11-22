@@ -195,4 +195,8 @@ UPDATE [A_TIME_DATE]
                CAST([year] AS CHAR(4))  
 	  where [date] between @starting_dt and @ending_dt
    
-    
+    update [A_TIME_DATE] set day_week_set = case when [day_week]<5 then 1 else 2 end
+
+
+
+
