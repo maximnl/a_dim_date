@@ -22,6 +22,8 @@ CREATE TABLE [dbo].[A_TIME_DATE](
 	[year_quarter_char] [char](7) NULL,
 	[year_quarter_short] [char](4) NULL,
 	[year_quarter_long] [char](6) NULL,
+	[year_current_week_fc], -- keeps forecast week for the current year forecast
+	[year_next_week_fc], -- keeps forecast week for the next year forecast
 	[semester] [tinyint] NULL,
 	[quarter] [tinyint] NULL,
 	[month] [tinyint] NULL,
@@ -43,6 +45,7 @@ CREATE TABLE [dbo].[A_TIME_DATE](
 	[day_month] [smallint] NULL,
 	[day_week] [smallint] NULL,
 	[days_2000] [int] NULL,
+	[day_week_set], -- splits working days into weeekends 
 	[YYYYMMDD] [char](8) NULL,
 	[MM/DD/YYYY] [char](10) NULL,
 	[YYYY/MM/DD] [char](10) NULL,
@@ -51,6 +54,7 @@ CREATE TABLE [dbo].[A_TIME_DATE](
 	[MMM DD YYYY] [char](11) NULL,
 	[epoch] [bigint] NULL,
 	[country] [char](2) NULL
+		
 ) ON [PRIMARY]
 GO
 ALTER TABLE [dbo].[A_TIME_DATE] ADD  CONSTRAINT [PK_A_TIME_DATE_] PRIMARY KEY CLUSTERED 
